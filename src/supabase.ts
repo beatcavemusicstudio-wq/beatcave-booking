@@ -31,12 +31,15 @@ export async function registrati(email: string, password: string, nome: string, 
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message ?? data.error);
+  if (!data.user && !data.id) throw new Error("Registrazione fallita");
+
+  const userId = data.user?.id ?? data.id;
 
   // Salva profilo
-  if (data.user?.id) {
+  if (userId) {
     await req("/profili", {
       method: "POST",
-      body: JSON.stringify({ id: data.user.id, nome, telefono }),
+      body: JSON.stringify({ id: userId, nome, telefono }),
     }).catch(() => {});
   }
   return data;
