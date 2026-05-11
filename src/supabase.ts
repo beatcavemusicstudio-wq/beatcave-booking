@@ -38,14 +38,25 @@ export async function registrati(email: string, password: string, nome: string, 
   if (data.error) throw new Error(data.error.message ?? data.error);
 
   const userId = data.user?.id ?? data.id ?? null;
+
+  // Salva profilo
   if (userId) {
     try {
       await req("/profili", {
         method: "POST",
         body: JSON.stringify({ id: userId, nome: nome || email, telefono: telefono || "" }),
       });
-    } catch { /* profilo già esistente o errore non critico */ }
+    } catch { /* profilo già esistente */ }
   }
+
+  // Aggiunge il cliente alla tabella clienti del gestionale
+  try {
+    await req("/clienti", {
+      method: "POST",
+      body: JSON.stringify({ nome: nome || email, email, telefono: telefono || "" }),
+    });
+  } catch { /* cliente già esistente con quella email */ }
+
   return data;
 }
 
