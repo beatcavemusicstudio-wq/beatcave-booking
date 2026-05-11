@@ -229,7 +229,7 @@
                      style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
                  </div>
                  <div>
-                   <SectionLabel>Telefono <span style={{ fontWeight: 400, color: "#bbb" }}>(opzionale)</span></SectionLabel>
+                   <SectionLabel>Telefono</SectionLabel>
                    <input type="tel" placeholder="+39 333 123 4567" value={telefono} onChange={e => setTelefono(e.target.value)}
                      style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
                  </div>
