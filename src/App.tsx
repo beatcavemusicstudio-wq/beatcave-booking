@@ -184,22 +184,27 @@
    const [loading, setLoading]   = useState(false);
  
    const handleSubmit = async () => {
-     setErrore("");
-     setLoading(true);
-     try {
-       if (modo === "registrati") {
-         if (!nome.trim()) { setErrore("Inserisci il tuo nome"); setLoading(false); return; }
-         await registrati(email, password, nome.trim(), telefono.trim());
-       }
-       const data = await accedi(email, password);
-       onLogin({ id: data.user.id, email: data.user.email, token: data.access_token });
-     } catch (e: unknown) {
-       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
-       setErrore(msg.includes("Invalid") ? "Email o password errati" : msg.includes("already") ? "Email già registrata" : msg);
-     } finally {
-       setLoading(false);
-     }
-   };
+  setErrore("");
+  setLoading(true);
+  try {
+    if (modo === "registrati") {
+      if (!nome.trim()) { setErrore("Inserisci il tuo nome"); setLoading(false); return; }
+      await registrati(email, password, nome.trim(), telefono.trim());
+    }
+    // Login sempre — sia dopo registrazione che login diretto
+    const data = await accedi(email, password);
+    if (!data?.user?.id) throw new Error("Login fallito");
+    onLogin({ id: data.user.id, email: data.user.email, token: data.access_token });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+    if (msg.includes("Invalid")) setErrore("Email o password errati");
+    else if (msg.includes("already")) setErrore("Email già registrata");
+    else if (msg.includes("not confirmed")) setErrore("Controlla la tua email per confermare l'account");
+    else setErrore(msg);
+  } finally {
+    setLoading(false);
+  }
+};
  
    return (
      <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100dvh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: "'SF Pro Text','Helvetica Neue',Arial,sans-serif", WebkitFontSmoothing: "antialiased" }}>
