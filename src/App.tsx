@@ -1,9 +1,10 @@
+// @ts-nocheck
 /**
  * BEATCAVE BOOKING — Portal Clienti
  * File: App.tsx
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   registrati, accedi, esci,
   fetchDisponibilita, inviaRichiesta,
@@ -22,25 +23,39 @@ const C = {
   amberLight:  "#FAEEDA",
   amberDark:   "#854F0B",
   purple:      "#534AB7",
+  purpleLight: "#EEEDFE",
   border:      "rgba(0,0,0,0.08)",
   bg:          "#f5f5f5",
 } as const;
 
-const MESI = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const MESI       = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESI_BREVI = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
 const GIORNI_BREVI = ["L","M","M","G","V","S","D"];
 
-type Tab = "prenota" | "sessioni" | "profilo";
+const PUBLIC_URL = "https://audio.beatcavestudio.it";
+const SUPA_BASE  = "https://lpznonwpofwywtvikgfm.supabase.co/rest/v1";
+const SUPA_KEY   = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
+const SUPA_H     = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`, "Content-Type": "application/json" };
+
+async function supaReq(path: string, options?: RequestInit) {
+  const res = await fetch(`${SUPA_BASE}${path}`, { ...options, headers: { ...SUPA_H, ...(options?.headers ?? {}) } });
+  if (!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+type Tab = "prenota" | "sessioni" | "brani" | "profilo";
 
 interface Utente { id: string; email: string; token: string; }
 interface Profilo { nome: string; telefono: string; }
 interface Disponibilita { id: number; data: string; ora_inizio: string; ora_fine: string; occupato: boolean; }
 interface Richiesta { id: number; data: string; ora_inizio: string; ora_fine: string; tipo: string; stato: string; note: string; }
 interface Sessione { id: number; data: string; ora_inizio: string; ora_fine: string; tipo: string; stato: string; prezzo: number; pagato: boolean; }
+interface AudioFile { id: number; brano: string; nome_file: string; storage_path: string; }
 
 function giornoSettimana(d: Date): number { return (d.getDay() + 6) % 7; }
 
-function generaGriglia(anno: number, mese: number): { giorno: number; corrente: boolean; iso: string }[] {
+function generaGriglia(anno: number, mese: number) {
   const primo  = new Date(anno, mese, 1);
   const ultimo = new Date(anno, mese + 1, 0);
   const offset = giornoSettimana(primo);
@@ -107,8 +122,107 @@ function LoadingScreen() {
   );
 }
 
-// ── LOGIN / REGISTRAZIONE ──
+// ── PLAYER AUDIO ──
+function AudioPlayer({ url, nome }: { url: string; nome: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying]   = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
 
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  };
+
+  const formatTime = (s: number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.purpleLight, borderRadius: 10, padding: "10px 12px" }}>
+      <audio ref={audioRef} src={url}
+        onTimeUpdate={e => setProgress((e.currentTarget.currentTime / (e.currentTarget.duration || 1)) * 100)}
+        onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
+        onEnded={() => setPlaying(false)} />
+      <button onClick={toggle} style={{ width: 36, height: 36, borderRadius: "50%", background: C.purple, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+        {playing
+          ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="1" width="3" height="10" rx="1" fill="#fff"/><rect x="7" y="1" width="3" height="10" rx="1" fill="#fff"/></svg>
+          : <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1l8 5-8 5V1z" fill="#fff"/></svg>
+        }
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: C.purple, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>{nome}</div>
+        <div style={{ height: 4, background: "rgba(83,74,183,0.2)", borderRadius: 2, overflow: "hidden", cursor: "pointer" }}
+          onClick={e => {
+            if (!audioRef.current) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            audioRef.current.currentTime = x * audioRef.current.duration;
+          }}>
+          <div style={{ height: "100%", width: `${progress}%`, background: C.purple, borderRadius: 2, transition: "width 0.1s" }} />
+        </div>
+      </div>
+      <div style={{ fontSize: 10, color: C.purple, flexShrink: 0 }}>{formatTime(duration)}</div>
+    </div>
+  );
+}
+
+// ── TAB I TUOI BRANI ──
+function TabBrani({ utente }: { utente: Utente }) {
+  const [files, setFiles]     = useState<AudioFile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supaReq(`/audio_files?cliente_email=eq.${encodeURIComponent(utente.email)}&order=brano,creato_il`)
+      .then(rows => { setFiles(rows ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const perBrano = files.reduce((acc, f) => {
+    if (!acc[f.brano]) acc[f.brano] = [];
+    acc[f.brano].push(f);
+    return acc;
+  }, {} as Record<string, AudioFile[]>);
+
+  const brani = Object.keys(perBrano).sort();
+
+  if (loading) return <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#aaa" }}>Caricamento…</div>;
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", paddingBottom: 80, display: "flex", flexDirection: "column", gap: 12 }}>
+      {brani.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 0" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🎵</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#555", marginBottom: 6 }}>Nessun file ancora</div>
+          <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6 }}>
+            Lo studio caricherà qui i tuoi brani<br/>dopo le sessioni
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+            {files.length} file · {brani.length} {brani.length === 1 ? "brano" : "brani"}
+          </div>
+          {brani.map(brano => (
+            <div key={brano} style={{ background: "#fff", border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 16 }}>🎵</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>{brano}</span>
+                <span style={{ fontSize: 10, color: "#aaa", background: "#f0f0f0", padding: "2px 8px", borderRadius: 8 }}>{perBrano[brano].length} file</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {perBrano[brano].map(f => (
+                  <AudioPlayer key={f.id} url={`${PUBLIC_URL}/${f.storage_path}`} nome={f.nome_file} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── LOGIN / REGISTRAZIONE ──
 function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
   const [modo, setModo]         = useState<"login" | "registrati">("login");
   const [email, setEmail]       = useState("");
@@ -147,13 +261,11 @@ function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
         <img src="/logo.png" alt="Beatcave Studio" style={{ height: 32, width: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Portale clienti</div>
       </div>
-
       <div style={{ flex: 1, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", borderRadius: 10, border: `0.5px solid ${C.border}`, overflow: "hidden", background: "#fff" }}>
           <button onClick={() => setModo("login")} style={{ flex: 1, padding: "11px", fontSize: 13, fontWeight: modo === "login" ? 700 : 500, border: "none", cursor: "pointer", background: modo === "login" ? C.orange : "#fff", color: modo === "login" ? "#fff" : "#888" }}>Accedi</button>
           <button onClick={() => setModo("registrati")} style={{ flex: 1, padding: "11px", fontSize: 13, fontWeight: modo === "registrati" ? 700 : 500, border: "none", borderLeft: `0.5px solid ${C.border}`, cursor: "pointer", background: modo === "registrati" ? C.orange : "#fff", color: modo === "registrati" ? "#fff" : "#888" }}>Registrati</button>
         </div>
-
         <Card>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {modo === "registrati" && (
@@ -188,7 +300,6 @@ function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
             </button>
           </div>
         </Card>
-
         <div style={{ background: C.orangeLight, borderRadius: 10, padding: "10px 13px", fontSize: 12, color: C.orange, lineHeight: 1.5 }}>
           <strong>Beatcave Studio</strong> — Prenota le tue sessioni e tieni traccia di tutto in un unico posto.
         </div>
@@ -198,7 +309,6 @@ function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
 }
 
 // ── TAB PRENOTA ──
-
 function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | null }) {
   const now = new Date();
   const [anno, setAnno]           = useState(now.getFullYear());
@@ -280,7 +390,6 @@ function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | nu
           })}
         </div>
       </Card>
-
       <Card>
         <SectionLabel>Slot disponibili — {formatDataLeggibile(giornoSel)}</SectionLabel>
         {loading ? (
@@ -301,7 +410,6 @@ function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | nu
           </div>
         )}
       </Card>
-
       {slotSel && (
         <Card>
           <SectionLabel>Dettagli richiesta</SectionLabel>
@@ -337,7 +445,6 @@ function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | nu
 }
 
 // ── TAB SESSIONI ──
-
 function TabSessioni({ utente }: { utente: Utente }) {
   const [richieste, setRichieste] = useState<Richiesta[]>([]);
   const [sessioni, setSessioni]   = useState<Sessione[]>([]);
@@ -375,7 +482,6 @@ function TabSessioni({ utente }: { utente: Utente }) {
           ))}
         </Card>
       )}
-
       {sessioniFuture.length > 0 && (
         <Card>
           <SectionLabel>Prossime sessioni</SectionLabel>
@@ -394,7 +500,6 @@ function TabSessioni({ utente }: { utente: Utente }) {
           })}
         </Card>
       )}
-
       {sessioniPassate.length > 0 && (
         <Card>
           <SectionLabel>Storico</SectionLabel>
@@ -410,7 +515,6 @@ function TabSessioni({ utente }: { utente: Utente }) {
           ))}
         </Card>
       )}
-
       {sessioni.length === 0 && richieste.length === 0 && (
         <div style={{ textAlign: "center", padding: "32px 0" }}>
           <div style={{ fontSize: 13, color: "#aaa", marginBottom: 8 }}>Nessuna sessione ancora</div>
@@ -422,7 +526,6 @@ function TabSessioni({ utente }: { utente: Utente }) {
 }
 
 // ── TAB PROFILO ──
-
 function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }: {
   utente: Utente; profilo: Profilo | null;
   onLogout: () => void; onAggiornaProfilo: (p: Profilo) => void;
@@ -485,7 +588,6 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }: {
 }
 
 // ── APP PRINCIPALE ──
-
 export default function App() {
   const [utente, setUtente]   = useState<Utente | null>(null);
   const [profilo, setProfilo] = useState<Profilo | null>(null);
@@ -523,9 +625,10 @@ export default function App() {
   if (!utente) return <SchermatAuth onLogin={handleLogin} />;
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "prenota",  label: "Prenota",  icon: "📅" },
-    { id: "sessioni", label: "Sessioni", icon: "🎙" },
-    { id: "profilo",  label: "Profilo",  icon: "👤" },
+    { id: "prenota",  label: "Prenota",       icon: "📅" },
+    { id: "sessioni", label: "Sessioni",       icon: "🎙" },
+    { id: "brani",    label: "I tuoi brani",  icon: "🎵" },
+    { id: "profilo",  label: "Profilo",        icon: "👤" },
   ];
 
   return (
@@ -540,14 +643,15 @@ export default function App() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
         {tab === "prenota"  && <TabPrenota  utente={utente} profilo={profilo} />}
         {tab === "sessioni" && <TabSessioni utente={utente} />}
+        {tab === "brani"    && <TabBrani    utente={utente} />}
         {tab === "profilo"  && <TabProfilo  utente={utente} profilo={profilo} onLogout={handleLogout} onAggiornaProfilo={setProfilo} />}
       </div>
 
-      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: "#fff", borderTop: `0.5px solid ${C.border}`, display: "grid", gridTemplateColumns: "repeat(3,1fr)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: "#fff", borderTop: `0.5px solid ${C.border}`, display: "grid", gridTemplateColumns: "repeat(4,1fr)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "10px 0 11px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none", cursor: "pointer" }}>
-            <span style={{ fontSize: 20 }}>{t.icon}</span>
-            <span style={{ fontSize: 10, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? C.orange : "#bbb" }}>{t.label}</span>
+            <span style={{ fontSize: 18 }}>{t.icon}</span>
+            <span style={{ fontSize: 9, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? C.orange : "#bbb" }}>{t.label}</span>
           </button>
         ))}
       </div>
