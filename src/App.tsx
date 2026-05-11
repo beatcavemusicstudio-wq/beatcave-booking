@@ -151,13 +151,10 @@
  }
  
  function Logo() {
-   return (
-     <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", letterSpacing: "-0.3px" }}>
-       Beat<span style={{ color: C.orange }}>cave</span>
-       <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: 400, marginLeft: 6 }}>Studio</span>
-     </div>
-   );
- }
+  return (
+    <img src="/logo.png" alt="Beatcave Studio" style={{ height: 28, width: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
+  );
+}
  
  function LoadingScreen() {
    return (
@@ -209,9 +206,7 @@
    return (
      <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100dvh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: "'SF Pro Text','Helvetica Neue',Arial,sans-serif", WebkitFontSmoothing: "antialiased" }}>
        <div style={{ background: C.dark, paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: 28, paddingLeft: 20, paddingRight: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-         <Logo />
-         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>Portale clienti</div>
-       </div>
+         <img src="/logo.png" alt="Beatcave Studio" style={{ height: 24, width: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
  
        <div style={{ flex: 1, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
          <div style={{ display: "flex", borderRadius: 10, border: `0.5px solid ${C.border}`, overflow: "hidden", background: "#fff" }}>
@@ -620,11 +615,8 @@
  
        {/* HEADER */}
        <div style={{ background: C.dark, paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)", paddingBottom: 14, paddingLeft: 16, paddingRight: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-         <Logo />
-         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
-           {profilo?.nome ?? utente.email.split("@")[0]}
-         </div>
-       </div>
+         <img src="/logo.png" alt="Beatcave Studio" style={{ height: 32, width: "auto", filter: "brightness(0) invert(1)", display: "block", marginBottom: 4 }} />
+<div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>Portale clienti</div>
  
        {/* CONTENUTO */}
        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
