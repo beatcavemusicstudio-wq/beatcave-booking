@@ -1,3 +1,8 @@
+/**
+ * BEATCAVE BOOKING — Client Supabase
+ * File: supabase.ts
+ */
+
 const BASE = "https://lpznonwpofwywtvikgfm.supabase.co";
 const KEY  = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
 
@@ -31,16 +36,15 @@ export async function registrati(email: string, password: string, nome: string, 
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message ?? data.error);
-  if (!data.user && !data.id) throw new Error("Registrazione fallita");
 
-  const userId = data.user?.id ?? data.id;
-
-  // Salva profilo
+  const userId = data.user?.id ?? data.id ?? null;
   if (userId) {
-    await req("/profili", {
-      method: "POST",
-      body: JSON.stringify({ id: userId, nome, telefono }),
-    }).catch(() => {});
+    try {
+      await req("/profili", {
+        method: "POST",
+        body: JSON.stringify({ id: userId, nome: nome || email, telefono: telefono || "" }),
+      });
+    } catch { /* profilo già esistente o errore non critico */ }
   }
   return data;
 }
