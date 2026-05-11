@@ -189,9 +189,9 @@
   try {
     if (modo === "registrati") {
       if (!nome.trim()) { setErrore("Inserisci il tuo nome"); setLoading(false); return; }
+      if (!telefono.trim()) { setErrore("Inserisci il tuo numero di telefono"); setLoading(false); return; }
       await registrati(email, password, nome.trim(), telefono.trim());
     }
-    // Login sempre — sia dopo registrazione che login diretto
     const data = await accedi(email, password);
     if (!data?.user?.id) throw new Error("Login fallito");
     onLogin({ id: data.user.id, email: data.user.email, token: data.access_token });
