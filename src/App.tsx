@@ -587,10 +587,12 @@
    }, []);
  
    const handleLogin = (u: Utente) => {
-     setUtente(u);
-     localStorage.setItem("bc_utente", JSON.stringify(u));
-     fetchProfilo(u.id).then(p => { if (p) setProfilo(p); });
-   };
+  setUtente(u);
+  localStorage.setItem("bc_utente", JSON.stringify(u));
+  if (u.id) {
+    fetchProfilo(u.id).then(p => { if (p) setProfilo(p); }).catch(() => {});
+  }
+};
  
    const handleLogout = async () => {
      if (utente) await esci(utente.token).catch(() => {});
