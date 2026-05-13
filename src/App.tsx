@@ -621,6 +621,10 @@ export default function App() {
   const [profilo, setProfilo] = useState<Profilo | null>(null);
   const [tab, setTab]         = useState<Tab>("prenota");
   const [loading, setLoading] = useState(true);
+  const [modalReset, setModalReset]   = useState(false);
+const [resetToken, setResetToken]   = useState("");
+const [nuovaPassword, setNuovaPass] = useState("");
+const [resettando, setResettando]   = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("bc_utente");
@@ -648,7 +652,18 @@ export default function App() {
     setProfilo(null);
     localStorage.removeItem("bc_utente");
   };
-
+// Gestisce il token di reset password dall'URL
+useEffect(() => {
+  const hash = window.location.hash;
+  if (hash.includes("type=recovery")) {
+    const params = new URLSearchParams(hash.replace("#", ""));
+    const accessToken = params.get("access_token");
+    if (accessToken) {
+      setModalReset(true);
+      setResetToken(accessToken);
+    }
+  }
+}, []);
   if (loading) return <LoadingScreen />;
   if (!utente) return <SchermatAuth onLogin={handleLogin} />;
 
@@ -661,6 +676,15 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100dvh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: "'SF Pro Text','Helvetica Neue',Arial,sans-serif", WebkitFontSmoothing: "antialiased" }}>
+      return (
+    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100dvh"...}>
+
+      {modalReset && (
+        <div style={{ position: "fixed", ...
+        // tutto il codice del modal
+        })}
+
+      <div style={{ background: C.dark, ...  // header che c'era già
       <div style={{ background: C.dark, paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)", paddingBottom: 14, paddingLeft: 16, paddingRight: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <img src="/logo.png" alt="Beatcave Studio" style={{ height: 26, width: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
