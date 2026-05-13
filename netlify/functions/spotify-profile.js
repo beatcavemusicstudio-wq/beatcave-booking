@@ -37,18 +37,17 @@ exports.handler = async (event) => {
 
     const token = await getToken();
 
-    const [artistRes, topTracksRes] = await Promise.all([
+    const [artistRes, albumsRes] = await Promise.all([
       fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
         headers: { "Authorization": `Bearer ${token}` },
       }),
-      fetch(`https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=IT`, {
+      fetch(`https://api.spotify.com/v1/artists/${artistId}/albums?limit=5&include_groups=album,single&market=IT`, {
         headers: { "Authorization": `Bearer ${token}` },
       }),
     ]);
 
-    const artist    = await artistRes.json();
-    const topTracks = await topTracksRes.json();
-console.log("TOP TRACKS:", JSON.stringify(topTracks));
+    const artist = await artistRes.json();
+    const albums = await albumsRes.json();
 
     return {
       statusCode: 200,
@@ -58,11 +57,11 @@ console.log("TOP TRACKS:", JSON.stringify(topTracks));
         followers: artist.followers?.total ?? 0,
         immagine:  artist.images?.[0]?.url ?? null,
         generi:    artist.genres ?? [],
-        brani:     (topTracks.tracks ?? []).slice(0, 5).map(t => ({
-          nome:     t.name,
-          album:    t.album?.name,
-          copertina: t.album?.images?.[1]?.url ?? null,
-          url:      t.external_urls?.spotify,
+        brani:     (albums.items ?? []).slice(0, 5).map(a => ({
+          nome:      a.name,
+          album:     a.album_type === "single" ? "Singolo" : "Album",
+          copertina: a.images?.[1]?.url ?? null,
+          url:       a.external_urls?.spotify,
         })),
       }),
     };
