@@ -48,6 +48,7 @@ exports.handler = async (event) => {
 
     const artist    = await artistRes.json();
     const topTracks = await topTracksRes.json();
+console.log("TOP TRACKS:", JSON.stringify(topTracks));
 
     return {
       statusCode: 200,
