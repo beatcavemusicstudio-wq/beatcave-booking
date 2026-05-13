@@ -119,3 +119,13 @@ export async function fetchProfilo(userId: string) {
 export async function aggiornaProfilo(userId: string, dati: { nome: string; telefono: string }) {
   return req(`/profili?id=eq.${userId}`, { method: "PATCH", body: JSON.stringify(dati) });
 }
+export async function resetPassword(email: string) {
+  const res = await fetch(`${BASE}/auth/v1/recover`, {
+    method: "POST",
+    headers: { "apikey": KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message ?? data.error);
+  return data;
+}
