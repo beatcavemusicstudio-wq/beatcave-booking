@@ -129,3 +129,13 @@ export async function resetPassword(email: string) {
   if (data.error) throw new Error(data.error.message ?? data.error);
   return data;
 }
+export async function aggiornaPassword(token: string, password: string) {
+  const res = await fetch(`${BASE}/auth/v1/user`, {
+    method: "PUT",
+    headers: { "apikey": KEY, "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message ?? data.error);
+  return data;
+}
