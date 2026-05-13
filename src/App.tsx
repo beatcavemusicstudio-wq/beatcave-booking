@@ -729,7 +729,6 @@ export default function App() {
 
   if (loading) return <LoadingScreen />;
 if (!utente) return <SchermatAuth onLogin={handleLogin} />;
-if (utente && !profilo) return <LoadingScreen />;
 
   const TABS = [
     { id: "prenota",  label: "Prenota",      icon: "📅" },
