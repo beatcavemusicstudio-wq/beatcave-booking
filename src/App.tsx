@@ -535,17 +535,75 @@ function TabSessioni({ utente }) {
   );
 }
 
+function SpotifyBanner({ spotifyUrl }) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!spotifyUrl) return;
+    setLoading(true);
+    fetch("/.netlify/functions/spotify-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spotifyUrl }),
+    }).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [spotifyUrl]);
+
+  if (!spotifyUrl) return null;
+  if (loading) return (
+    <div style={{ background: "#191414", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid #1DB954", borderTopColor: "transparent" }} />
+      <div style={{ fontSize: 13, color: "#fff" }}>Caricamento profilo Spotify…</div>
+    </div>
+  );
+  if (!data || data.error) return null;
+
+  return (
+    <div style={{ background: "#191414", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ position: "relative", height: 130, background: data.immagine ? `url(${data.immagine}) center/cover` : "#282828" }}>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.85))" }} />
+        <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, display: "flex", alignItems: "flex-end", gap: 10 }}>
+          {data.immagine && <img src={data.immagine} style={{ width: 52, height: 52, borderRadius: "50%", border: "2px solid #1DB954", flexShrink: 0 }} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{data.nome}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>
+              {data.followers?.toLocaleString("it-IT")} follower
+              {data.generi?.length > 0 && ` · ${data.generi[0]}`}
+            </div>
+          </div>
+          <svg width="22" height="22" viewBox="0 0 20 20" fill="#1DB954"><path d="M10 0C4.477 0 0 4.477 0 10s4.477 10 10 10 10-4.477 10-10S15.523 0 10 0zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.723a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.973-.519.781.781 0 0 1 .52-.973c3.632-1.102 8.147-.568 11.234 1.329a.78.78 0 0 1 .256 1.072zm.105-2.835C13.16 7.006 8.553 6.849 5.8 7.683a.937.937 0 1 1-.543-1.794c3.174-.964 8.451-.778 11.787 1.353a.937.937 0 0 1-.13 1.624z"/></svg>
+        </div>
+      </div>
+      <div style={{ padding: "10px 12px 12px" }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Top brani</div>
+        {data.brani?.map((b, i) => (
+          <a key={i} href={b.url} target="_blank" rel="noreferrer"
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: i < data.brani.length - 1 ? "0.5px solid rgba(255,255,255,0.07)" : "none", textDecoration: "none" }}>
+            {b.copertina && <img src={b.copertina} style={{ width: 36, height: 36, borderRadius: 4, flexShrink: 0 }} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.nome}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{b.album}</div>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
-  const [nome, setNome]         = useState(profilo?.nome ?? "");
-  const [telefono, setTelefono] = useState(profilo?.telefono ?? "");
-  const [salvando, setSalvando] = useState(false);
-  const [toast, setToast]       = useState(false);
+  const [nome, setNome]             = useState(profilo?.nome ?? "");
+  const [telefono, setTelefono]     = useState(profilo?.telefono ?? "");
+  const [spotifyUrl, setSpotifyUrl] = useState(profilo?.spotify_url ?? "");
+  const [salvando, setSalvando]     = useState(false);
+  const [toast, setToast]           = useState(false);
 
   const handleSalva = async () => {
     setSalvando(true);
     try {
-      await aggiornaProfilo(utente.id, { nome, telefono });
-      onAggiornaProfilo({ nome, telefono });
+      await aggiornaProfilo(utente.id, { nome, telefono, spotify_url: spotifyUrl });
+      onAggiornaProfilo({ nome, telefono, spotify_url: spotifyUrl });
       setToast(true);
       setTimeout(() => setToast(false), 2000);
     } catch { alert("Errore nel salvataggio. Riprova."); }
@@ -555,6 +613,9 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", paddingBottom: 80, display: "flex", flexDirection: "column", gap: 12 }}>
       {toast && <div style={{ background: C.green, color: "#fff", borderRadius: 10, padding: "11px 14px", fontSize: 13, fontWeight: 700, textAlign: "center" }}>✓ Profilo aggiornato!</div>}
+
+      <SpotifyBanner spotifyUrl={profilo?.spotify_url} />
+
       <Card>
         <SectionLabel>I tuoi dati</SectionLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -567,6 +628,11 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
             <SectionLabel>Telefono</SectionLabel>
             <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
               style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
+          </div>
+          <div>
+            <SectionLabel>Profilo Spotify <span style={{ fontWeight: 400, color: "#bbb" }}>(opzionale)</span></SectionLabel>
+            <input type="url" placeholder="https://open.spotify.com/artist/..." value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)}
+              style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", outline: "none" }} />
           </div>
           <div>
             <SectionLabel>Email</SectionLabel>
@@ -594,10 +660,10 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
 }
 
 export default function App() {
-  const [utente, setUtente]       = useState(null);
-  const [profilo, setProfilo]     = useState(null);
-  const [tab, setTab]             = useState("prenota");
-  const [loading, setLoading]     = useState(true);
+  const [utente, setUtente]           = useState(null);
+  const [profilo, setProfilo]         = useState(null);
+  const [tab, setTab]                 = useState("prenota");
+  const [loading, setLoading]         = useState(true);
   const [modalReset, setModalReset]   = useState(false);
   const [resetToken, setResetToken]   = useState("");
   const [nuovaPassword, setNuovaPass] = useState("");
@@ -608,10 +674,7 @@ export default function App() {
     if (hash.includes("type=recovery")) {
       const params = new URLSearchParams(hash.replace("#", ""));
       const accessToken = params.get("access_token");
-      if (accessToken) {
-        setModalReset(true);
-        setResetToken(accessToken);
-      }
+      if (accessToken) { setModalReset(true); setResetToken(accessToken); }
     }
     const saved = localStorage.getItem("bc_utente");
     if (saved) {
@@ -627,15 +690,12 @@ export default function App() {
   const handleLogin = (u) => {
     setUtente(u);
     localStorage.setItem("bc_utente", JSON.stringify(u));
-    if (u.id) {
-      fetchProfilo(u.id).then(p => { if (p) setProfilo(p); }).catch(() => {});
-    }
+    if (u.id) fetchProfilo(u.id).then(p => { if (p) setProfilo(p); }).catch(() => {});
   };
 
   const handleLogout = async () => {
     if (utente) await esci(utente.token).catch(() => {});
-    setUtente(null);
-    setProfilo(null);
+    setUtente(null); setProfilo(null);
     localStorage.removeItem("bc_utente");
   };
 
