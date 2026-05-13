@@ -596,6 +596,10 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   const [nome, setNome]             = useState(profilo?.nome ?? "");
   const [telefono, setTelefono]     = useState(profilo?.telefono ?? "");
   const [spotifyUrl, setSpotifyUrl] = useState(profilo?.spotify_url ?? "");
+
+useEffect(() => {
+  setSpotifyUrl(profilo?.spotify_url ?? "");
+}, [profilo?.spotify_url]);
   const [salvando, setSalvando]     = useState(false);
   const [toast, setToast]           = useState(false);
 
