@@ -9,7 +9,7 @@ import {
   registrati, accedi, esci,
   fetchDisponibilita, inviaRichiesta,
   fetchRichiesteCliente, fetchSessioniCliente,
-  fetchProfilo, aggiornaProfilo, resetPassword,
+  fetchProfilo, aggiornaProfilo, resetPassword, aggiornaPassword,
 } from "./supabase";
 
 const C = {
@@ -37,7 +37,7 @@ const SUPA_BASE  = "https://lpznonwpofwywtvikgfm.supabase.co/rest/v1";
 const SUPA_KEY   = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
 const SUPA_H     = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`, "Content-Type": "application/json" };
 
-async function supaReq(path: string, options?: RequestInit) {
+async function supaReq(path, options) {
   const res = await fetch(`${SUPA_BASE}${path}`, { ...options, headers: { ...SUPA_H, ...(options?.headers ?? {}) } });
   if (!res.ok) throw new Error(await res.text());
   const text = await res.text();
@@ -46,16 +46,9 @@ async function supaReq(path: string, options?: RequestInit) {
 
 type Tab = "prenota" | "sessioni" | "brani" | "profilo";
 
-interface Utente { id: string; email: string; token: string; }
-interface Profilo { nome: string; telefono: string; }
-interface Disponibilita { id: number; data: string; ora_inizio: string; ora_fine: string; occupato: boolean; }
-interface Richiesta { id: number; data: string; ora_inizio: string; ora_fine: string; tipo: string; stato: string; note: string; }
-interface Sessione { id: number; data: string; ora_inizio: string; ora_fine: string; tipo: string; stato: string; prezzo: number; pagato: boolean; }
-interface AudioFile { id: number; brano: string; nome_file: string; storage_path: string; }
+function giornoSettimana(d) { return (d.getDay() + 6) % 7; }
 
-function giornoSettimana(d: Date): number { return (d.getDay() + 6) % 7; }
-
-function generaGriglia(anno: number, mese: number) {
+function generaGriglia(anno, mese) {
   const primo  = new Date(anno, mese, 1);
   const ultimo = new Date(anno, mese + 1, 0);
   const offset = giornoSettimana(primo);
@@ -79,15 +72,15 @@ function generaGriglia(anno: number, mese: number) {
   return celle;
 }
 
-function formatDataLeggibile(iso: string): string {
+function formatDataLeggibile(iso) {
   if (!iso) return "";
   const d = new Date(iso + "T12:00:00");
   return `${d.getDate()} ${MESI_BREVI[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function oggiISO(): string { return new Date().toISOString().split("T")[0]; }
+function oggiISO() { return new Date().toISOString().split("T")[0]; }
 
-function badgeSessione(stato: string) {
+function badgeSessione(stato) {
   switch (stato) {
     case "confermata":    return { label: "Confermata",    bg: C.greenLight,  color: C.greenDark };
     case "in_corso":      return { label: "In corso",      bg: C.orangeLight, color: C.orange    };
@@ -96,18 +89,18 @@ function badgeSessione(stato: string) {
   }
 }
 
-const TIPO_COLORI: Record<string, string> = {
+const TIPO_COLORI = {
   Registrazione: C.orange,
   Mixing:        C.green,
   Produzione:    C.purple,
   Mastering:     C.amber,
 };
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children }) {
   return <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.9px", marginBottom: 8 }}>{children}</div>;
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function Card({ children, style }) {
   return <div style={{ background: "#fff", border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, ...style }}>{children}</div>;
 }
 
@@ -122,9 +115,8 @@ function LoadingScreen() {
   );
 }
 
-// ── PLAYER AUDIO ──
-function AudioPlayer({ url, nome }: { url: string; nome: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+function AudioPlayer({ url, nome }) {
+  const audioRef = useRef(null);
   const [playing, setPlaying]   = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -135,7 +127,7 @@ function AudioPlayer({ url, nome }: { url: string; nome: string }) {
     else { audioRef.current.play(); setPlaying(true); }
   };
 
-  const formatTime = (s: number) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+  const formatTime = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.purpleLight, borderRadius: 10, padding: "10px 12px" }}>
@@ -166,9 +158,8 @@ function AudioPlayer({ url, nome }: { url: string; nome: string }) {
   );
 }
 
-// ── TAB I TUOI BRANI ──
-function TabBrani({ utente }: { utente: Utente }) {
-  const [files, setFiles]     = useState<AudioFile[]>([]);
+function TabBrani({ utente }) {
+  const [files, setFiles]     = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -181,7 +172,7 @@ function TabBrani({ utente }: { utente: Utente }) {
     if (!acc[f.brano]) acc[f.brano] = [];
     acc[f.brano].push(f);
     return acc;
-  }, {} as Record<string, AudioFile[]>);
+  }, {});
 
   const brani = Object.keys(perBrano).sort();
 
@@ -193,9 +184,7 @@ function TabBrani({ utente }: { utente: Utente }) {
         <div style={{ textAlign: "center", padding: "48px 0" }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🎵</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#555", marginBottom: 6 }}>Nessun file ancora</div>
-          <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6 }}>
-            Lo studio caricherà qui i tuoi brani<br/>dopo le sessioni
-          </div>
+          <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6 }}>Lo studio caricherà qui i tuoi brani<br/>dopo le sessioni</div>
         </div>
       ) : (
         <>
@@ -211,14 +200,14 @@ function TabBrani({ utente }: { utente: Utente }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {perBrano[brano].map(f => (
-  <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    <AudioPlayer url={`${PUBLIC_URL}/${f.storage_path}`} nome={f.nome_file} />
-    <a href={`${PUBLIC_URL}/${f.storage_path}`} download={f.nome_file}
-      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 600, color: C.purple, background: C.purpleLight, padding: "8px", borderRadius: 8, textDecoration: "none" }}>
-      ⬇ Scarica
-    </a>
-  </div>
-))}
+                  <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <AudioPlayer url={`${PUBLIC_URL}/${f.storage_path}`} nome={f.nome_file} />
+                    <a href={`${PUBLIC_URL}/${f.storage_path}`} download={f.nome_file}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 600, color: C.purple, background: C.purpleLight, padding: "8px", borderRadius: 8, textDecoration: "none" }}>
+                      ⬇ Scarica
+                    </a>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -228,9 +217,8 @@ function TabBrani({ utente }: { utente: Utente }) {
   );
 }
 
-// ── LOGIN / REGISTRAZIONE ──
-function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
-  const [modo, setModo]         = useState<"login" | "registrati">("login");
+function SchermatAuth({ onLogin }) {
+  const [modo, setModo]         = useState("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [nome, setNome]         = useState("");
@@ -239,15 +227,15 @@ function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
   const [loading, setLoading]   = useState(false);
   const [resetInviato, setResetInviato] = useState(false);
 
-const handleReset = async () => {
-  if (!email.trim()) { setErrore("Inserisci la tua email prima"); return; }
-  setLoading(true);
-  try {
-    await resetPassword(email);
-    setResetInviato(true);
-  } catch { setErrore("Errore nell'invio. Controlla l'email."); }
-  finally { setLoading(false); }
-};
+  const handleReset = async () => {
+    if (!email.trim()) { setErrore("Inserisci la tua email prima"); return; }
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setResetInviato(true);
+    } catch { setErrore("Errore nell'invio. Controlla l'email."); }
+    finally { setLoading(false); }
+  };
 
   const handleSubmit = async () => {
     setErrore("");
@@ -261,7 +249,7 @@ const handleReset = async () => {
       const data = await accedi(email, password);
       if (!data?.user?.id) throw new Error("Login fallito");
       onLogin({ id: data.user.id, email: data.user.email, token: data.access_token });
-    } catch (e: unknown) {
+    } catch (e) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       if (msg.includes("Invalid")) setErrore("Email o password errati");
       else if (msg.includes("already")) setErrore("Email già registrata");
@@ -290,25 +278,25 @@ const handleReset = async () => {
                 <div>
                   <SectionLabel>Nome completo</SectionLabel>
                   <input type="text" placeholder="Mario Bianchi" value={nome} onChange={e => setNome(e.target.value)}
-                    style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                    style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
                 </div>
                 <div>
                   <SectionLabel>Telefono</SectionLabel>
                   <input type="tel" placeholder="+39 333 123 4567" value={telefono} onChange={e => setTelefono(e.target.value)}
-                    style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                    style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
                 </div>
               </>
             )}
             <div>
               <SectionLabel>Email</SectionLabel>
               <input type="email" placeholder="mario@email.com" value={email} onChange={e => setEmail(e.target.value)}
-                style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
             </div>
             <div>
               <SectionLabel>Password</SectionLabel>
               <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSubmit()}
-                style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+                style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
             </div>
             {errore && <div style={{ fontSize: 12, color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: 8 }}>{errore}</div>}
             <button onClick={handleSubmit} disabled={loading}
@@ -316,16 +304,16 @@ const handleReset = async () => {
               {loading ? "Caricamento…" : modo === "login" ? "Accedi" : "Crea account"}
             </button>
             {modo === "login" && (
-  <div style={{ textAlign: "center" }}>
-    {resetInviato ? (
-      <div style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ Email inviata! Controlla la tua casella.</div>
-    ) : (
-      <button onClick={handleReset} style={{ fontSize: 12, color: C.orange, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-        Password dimenticata?
-      </button>
-    )}
-  </div>
-)}
+              <div style={{ textAlign: "center" }}>
+                {resetInviato ? (
+                  <div style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ Email inviata! Controlla la tua casella.</div>
+                ) : (
+                  <button onClick={handleReset} style={{ fontSize: 12, color: C.orange, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                    Password dimenticata?
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </Card>
         <div style={{ background: C.orangeLight, borderRadius: 10, padding: "10px 13px", fontSize: 12, color: C.orange, lineHeight: 1.5 }}>
@@ -336,15 +324,14 @@ const handleReset = async () => {
   );
 }
 
-// ── TAB PRENOTA ──
-function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | null }) {
+function TabPrenota({ utente, profilo }) {
   const now = new Date();
   const [anno, setAnno]           = useState(now.getFullYear());
   const [mese, setMese]           = useState(now.getMonth());
   const [giornoSel, setGiornoSel] = useState(oggiISO());
-  const [disponibilita, setDisp]  = useState<Disponibilita[]>([]);
+  const [disponibilita, setDisp]  = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [slotSel, setSlotSel]     = useState<Disponibilita | null>(null);
+  const [slotSel, setSlotSel]     = useState(null);
   const [tipo, setTipo]           = useState("Registrazione");
   const [note, setNote]           = useState("");
   const [inviando, setInviando]   = useState(false);
@@ -383,11 +370,7 @@ function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | nu
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", paddingBottom: 80, display: "flex", flexDirection: "column", gap: 12 }}>
-      {successo && (
-        <div style={{ background: C.green, color: "#fff", borderRadius: 10, padding: "12px 14px", fontSize: 13, fontWeight: 700, textAlign: "center" }}>
-          ✓ Richiesta inviata! Ti confermeremo presto.
-        </div>
-      )}
+      {successo && <div style={{ background: C.green, color: "#fff", borderRadius: 10, padding: "12px 14px", fontSize: 13, fontWeight: 700, textAlign: "center" }}>✓ Richiesta inviata! Ti confermeremo presto.</div>}
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>{MESI[mese]} {anno}</div>
@@ -456,7 +439,7 @@ function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | nu
             <div>
               <SectionLabel>Note (opzionale)</SectionLabel>
               <textarea placeholder="Aggiungi una nota per lo studio…" value={note} onChange={e => setNote(e.target.value)} rows={3}
-                style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, resize: "none", outline: "none", boxSizing: "border-box" as const, fontFamily: "inherit" }} />
+                style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, resize: "none", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
             <div style={{ background: C.orangeLight, borderRadius: 9, padding: "10px 12px", fontSize: 12, color: C.orange, lineHeight: 1.5 }}>
               Stai richiedendo: <strong>{slotSel.ora_inizio} – {slotSel.ora_fine}</strong> il <strong>{formatDataLeggibile(slotSel.data)}</strong>
@@ -472,10 +455,9 @@ function TabPrenota({ utente, profilo }: { utente: Utente; profilo: Profilo | nu
   );
 }
 
-// ── TAB SESSIONI ──
-function TabSessioni({ utente }: { utente: Utente }) {
-  const [richieste, setRichieste] = useState<Richiesta[]>([]);
-  const [sessioni, setSessioni]   = useState<Sessione[]>([]);
+function TabSessioni({ utente }) {
+  const [richieste, setRichieste] = useState([]);
+  const [sessioni, setSessioni]   = useState([]);
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
@@ -553,11 +535,7 @@ function TabSessioni({ utente }: { utente: Utente }) {
   );
 }
 
-// ── TAB PROFILO ──
-function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }: {
-  utente: Utente; profilo: Profilo | null;
-  onLogout: () => void; onAggiornaProfilo: (p: Profilo) => void;
-}) {
+function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   const [nome, setNome]         = useState(profilo?.nome ?? "");
   const [telefono, setTelefono] = useState(profilo?.telefono ?? "");
   const [salvando, setSalvando] = useState(false);
@@ -583,12 +561,12 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }: {
           <div>
             <SectionLabel>Nome</SectionLabel>
             <input type="text" value={nome} onChange={e => setNome(e.target.value)}
-              style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+              style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
           </div>
           <div>
             <SectionLabel>Telefono</SectionLabel>
             <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
-              style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box" as const, outline: "none" }} />
+              style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
           </div>
           <div>
             <SectionLabel>Email</SectionLabel>
@@ -615,22 +593,30 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }: {
   );
 }
 
-// ── APP PRINCIPALE ──
 export default function App() {
-  const [utente, setUtente]   = useState<Utente | null>(null);
-  const [profilo, setProfilo] = useState<Profilo | null>(null);
-  const [tab, setTab]         = useState<Tab>("prenota");
-  const [loading, setLoading] = useState(true);
+  const [utente, setUtente]       = useState(null);
+  const [profilo, setProfilo]     = useState(null);
+  const [tab, setTab]             = useState("prenota");
+  const [loading, setLoading]     = useState(true);
   const [modalReset, setModalReset]   = useState(false);
-const [resetToken, setResetToken]   = useState("");
-const [nuovaPassword, setNuovaPass] = useState("");
-const [resettando, setResettando]   = useState(false);
+  const [resetToken, setResetToken]   = useState("");
+  const [nuovaPassword, setNuovaPass] = useState("");
+  const [resettando, setResettando]   = useState(false);
 
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery")) {
+      const params = new URLSearchParams(hash.replace("#", ""));
+      const accessToken = params.get("access_token");
+      if (accessToken) {
+        setModalReset(true);
+        setResetToken(accessToken);
+      }
+    }
     const saved = localStorage.getItem("bc_utente");
     if (saved) {
       try {
-        const u = JSON.parse(saved) as Utente;
+        const u = JSON.parse(saved);
         setUtente(u);
         fetchProfilo(u.id).then(p => { if (p) setProfilo(p); }).catch(() => {});
       } catch { localStorage.removeItem("bc_utente"); }
@@ -638,7 +624,7 @@ const [resettando, setResettando]   = useState(false);
     setLoading(false);
   }, []);
 
-  const handleLogin = (u: Utente) => {
+  const handleLogin = (u) => {
     setUtente(u);
     localStorage.setItem("bc_utente", JSON.stringify(u));
     if (u.id) {
@@ -652,39 +638,41 @@ const [resettando, setResettando]   = useState(false);
     setProfilo(null);
     localStorage.removeItem("bc_utente");
   };
-// Gestisce il token di reset password dall'URL
-useEffect(() => {
-  const hash = window.location.hash;
-  if (hash.includes("type=recovery")) {
-    const params = new URLSearchParams(hash.replace("#", ""));
-    const accessToken = params.get("access_token");
-    if (accessToken) {
-      setModalReset(true);
-      setResetToken(accessToken);
-    }
-  }
-}, []);
+
   if (loading) return <LoadingScreen />;
   if (!utente) return <SchermatAuth onLogin={handleLogin} />;
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "prenota",  label: "Prenota",       icon: "📅" },
-    { id: "sessioni", label: "Sessioni",       icon: "🎙" },
-    { id: "brani",    label: "I tuoi brani",  icon: "🎵" },
-    { id: "profilo",  label: "Profilo",        icon: "👤" },
+  const TABS = [
+    { id: "prenota",  label: "Prenota",      icon: "📅" },
+    { id: "sessioni", label: "Sessioni",      icon: "🎙" },
+    { id: "brani",    label: "I tuoi brani", icon: "🎵" },
+    { id: "profilo",  label: "Profilo",       icon: "👤" },
   ];
 
   return (
     <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100dvh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: "'SF Pro Text','Helvetica Neue',Arial,sans-serif", WebkitFontSmoothing: "antialiased" }}>
-      return (
-    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100dvh"...}>
 
       {modalReset && (
-        <div style={{ position: "fixed", ...
-        // tutto il codice del modal
-        })}
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 380 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Nuova password</div>
+            <input type="password" placeholder="Nuova password" value={nuovaPassword} onChange={e => setNuovaPass(e.target.value)}
+              style={{ width: "100%", padding: "11px 13px", borderRadius: 10, border: `0.5px solid rgba(0,0,0,0.1)`, fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 12 }} />
+            <button onClick={async () => {
+              setResettando(true);
+              try {
+                await aggiornaPassword(resetToken, nuovaPassword);
+                setModalReset(false);
+                alert("Password aggiornata! Ora puoi accedere.");
+              } catch { alert("Errore. Riprova."); }
+              finally { setResettando(false); }
+            }} style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: C.orange, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+              {resettando ? "Salvataggio…" : "Salva nuova password"}
+            </button>
+          </div>
+        </div>
+      )}
 
-      <div style={{ background: C.dark, ...  // header che c'era già
       <div style={{ background: C.dark, paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)", paddingBottom: 14, paddingLeft: 16, paddingRight: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <img src="/logo.png" alt="Beatcave Studio" style={{ height: 26, width: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
