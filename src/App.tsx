@@ -9,7 +9,7 @@ import {
   registrati, accedi, esci,
   fetchDisponibilita, inviaRichiesta,
   fetchRichiesteCliente, fetchSessioniCliente,
-  fetchProfilo, aggiornaProfilo,
+  fetchProfilo, aggiornaProfilo, resetPassword,
 } from "./supabase";
 
 const C = {
