@@ -575,7 +575,7 @@ function SpotifyBanner({ spotifyUrl }) {
         </div>
       </div>
       <div style={{ padding: "10px 12px 12px" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Top brani</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Ultimi rilasci</div>
         {data.brani?.map((b, i) => (
           <a key={i} href={b.url} target="_blank" rel="noreferrer"
             style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: i < data.brani.length - 1 ? "0.5px solid rgba(255,255,255,0.07)" : "none", textDecoration: "none" }}>
@@ -596,21 +596,20 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   const [nome, setNome]             = useState(profilo?.nome ?? "");
   const [telefono, setTelefono]     = useState(profilo?.telefono ?? "");
   const [spotifyUrl, setSpotifyUrl] = useState(profilo?.spotify_url ?? "");
-  useEffect(() => { setNome(profilo?.nome ?? ""); }, [profilo?.nome]);
-useEffect(() => { setTelefono(profilo?.telefono ?? ""); }, [profilo?.telefono]);
-useEffect(() => { setSpotifyUrl(profilo?.spotify_url ?? ""); }, [profilo?.spotify_url]);
-
-useEffect(() => {
-  setSpotifyUrl(profilo?.spotify_url ?? "");
-}, [profilo?.spotify_url]);
   const [salvando, setSalvando]     = useState(false);
   const [toast, setToast]           = useState(false);
+
+  useEffect(() => { setNome(profilo?.nome ?? ""); }, [profilo?.nome]);
+  useEffect(() => { setTelefono(profilo?.telefono ?? ""); }, [profilo?.telefono]);
+  useEffect(() => { setSpotifyUrl(profilo?.spotify_url ?? ""); }, [profilo?.spotify_url]);
 
   const handleSalva = async () => {
     setSalvando(true);
     try {
       await aggiornaProfilo(utente.id, { nome, telefono, spotify_url: spotifyUrl });
-      onAggiornaProfilo({ nome, telefono, spotify_url: spotifyUrl });
+      const nuovoProfilo = { ...profilo, nome, telefono, spotify_url: spotifyUrl };
+      onAggiornaProfilo(nuovoProfilo);
+      localStorage.setItem("bc_profilo", JSON.stringify(nuovoProfilo));
       setToast(true);
       setTimeout(() => setToast(false), 2000);
     } catch { alert("Errore nel salvataggio. Riprova."); }
@@ -677,33 +676,55 @@ export default function App() {
   const [resettando, setResettando]   = useState(false);
 
   useEffect(() => {
+    // Gestisce reset password da URL
     const hash = window.location.hash;
     if (hash.includes("type=recovery")) {
       const params = new URLSearchParams(hash.replace("#", ""));
       const accessToken = params.get("access_token");
       if (accessToken) { setModalReset(true); setResetToken(accessToken); }
     }
+
+    // Ripristina sessione da localStorage
+    const savedProfilo = localStorage.getItem("bc_profilo");
+    if (savedProfilo) {
+      try { setProfilo(JSON.parse(savedProfilo)); } catch {}
+    }
+
     const saved = localStorage.getItem("bc_utente");
     if (saved) {
       try {
         const u = JSON.parse(saved);
         setUtente(u);
-        fetchProfilo(u.id).then(p => { if (p) setProfilo(p); }).catch(() => {});
+        // Aggiorna profilo dal server in background
+        fetchProfilo(u.id).then(p => {
+          if (p) {
+            setProfilo(p);
+            localStorage.setItem("bc_profilo", JSON.stringify(p));
+          }
+        }).catch(() => {});
       } catch { localStorage.removeItem("bc_utente"); }
     }
     setLoading(false);
   }, []);
 
-  const handleLogin = (u) => {
+  const handleLogin = async (u) => {
     setUtente(u);
     localStorage.setItem("bc_utente", JSON.stringify(u));
-    if (u.id) fetchProfilo(u.id).then(p => { if (p) setProfilo(p); }).catch(() => {});
+    try {
+      const p = await fetchProfilo(u.id);
+      if (p) {
+        setProfilo(p);
+        localStorage.setItem("bc_profilo", JSON.stringify(p));
+      }
+    } catch {}
   };
 
   const handleLogout = async () => {
     if (utente) await esci(utente.token).catch(() => {});
-    setUtente(null); setProfilo(null);
+    setUtente(null);
+    setProfilo(null);
     localStorage.removeItem("bc_utente");
+    localStorage.removeItem("bc_profilo");
   };
 
   if (loading) return <LoadingScreen />;
