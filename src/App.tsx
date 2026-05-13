@@ -237,6 +237,17 @@ function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
   const [telefono, setTelefono] = useState("");
   const [errore, setErrore]     = useState("");
   const [loading, setLoading]   = useState(false);
+  const [resetInviato, setResetInviato] = useState(false);
+
+const handleReset = async () => {
+  if (!email.trim()) { setErrore("Inserisci la tua email prima"); return; }
+  setLoading(true);
+  try {
+    await resetPassword(email);
+    setResetInviato(true);
+  } catch { setErrore("Errore nell'invio. Controlla l'email."); }
+  finally { setLoading(false); }
+};
 
   const handleSubmit = async () => {
     setErrore("");
@@ -304,6 +315,17 @@ function SchermatAuth({ onLogin }: { onLogin: (u: Utente) => void }) {
               style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: loading ? "#ccc" : C.orange, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer" }}>
               {loading ? "Caricamento…" : modo === "login" ? "Accedi" : "Crea account"}
             </button>
+            {modo === "login" && (
+  <div style={{ textAlign: "center" }}>
+    {resetInviato ? (
+      <div style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ Email inviata! Controlla la tua casella.</div>
+    ) : (
+      <button onClick={handleReset} style={{ fontSize: 12, color: C.orange, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+        Password dimenticata?
+      </button>
+    )}
+  </div>
+)}
           </div>
         </Card>
         <div style={{ background: C.orangeLight, borderRadius: 10, padding: "10px 13px", fontSize: 12, color: C.orange, lineHeight: 1.5 }}>
