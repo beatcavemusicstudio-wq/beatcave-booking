@@ -211,8 +211,14 @@ function TabBrani({ utente }: { utente: Utente }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {perBrano[brano].map(f => (
-                  <AudioPlayer key={f.id} url={`${PUBLIC_URL}/${f.storage_path}`} nome={f.nome_file} />
-                ))}
+  <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <AudioPlayer url={`${PUBLIC_URL}/${f.storage_path}`} nome={f.nome_file} />
+    <a href={`${PUBLIC_URL}/${f.storage_path}`} download={f.nome_file}
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 600, color: C.purple, background: C.purpleLight, padding: "8px", borderRadius: 8, textDecoration: "none" }}>
+      ⬇ Scarica
+    </a>
+  </div>
+))}
               </div>
             </div>
           ))}
