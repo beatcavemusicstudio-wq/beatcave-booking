@@ -1,8 +1,3 @@
-/**
- * BEATCAVE BOOKING — Client Supabase
- * File: supabase.ts
- */
-
 const BASE = "https://lpznonwpofwywtvikgfm.supabase.co";
 const KEY  = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
 
@@ -38,13 +33,11 @@ export async function registrati(email: string, password: string, nome: string, 
   if (data.error) throw new Error(data.error.message ?? data.error);
 
   const userId = data.user?.id ?? data.id ?? null;
-
-  // Salva profilo
   if (userId) {
     try {
       await req("/profili", {
         method: "POST",
-        body: JSON.stringify({ id: userId, nome: nome || email, telefono: telefono || "" }),
+        body: JSON.stringify({ id: userId, nome: nome || email, telefono: telefono || "", spotify_url: "" }),
       });
     } catch { /* profilo già esistente */ }
   }
@@ -76,6 +69,28 @@ export async function esci(token: string) {
     method: "POST",
     headers: { "apikey": KEY, "Authorization": `Bearer ${token}` },
   });
+}
+
+export async function resetPassword(email: string) {
+  const res = await fetch(`${BASE}/auth/v1/recover`, {
+    method: "POST",
+    headers: { "apikey": KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message ?? data.error);
+  return data;
+}
+
+export async function aggiornaPassword(token: string, password: string) {
+  const res = await fetch(`${BASE}/auth/v1/user`, {
+    method: "PUT",
+    headers: { "apikey": KEY, "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message ?? data.error);
+  return data;
 }
 
 // ── DISPONIBILITÀ ──
@@ -116,26 +131,6 @@ export async function fetchProfilo(userId: string) {
   return Array.isArray(rows) ? rows[0] : null;
 }
 
-export async function aggiornaProfilo(userId: string, dati: { nome: string; telefono: string }) {
+export async function aggiornaProfilo(userId: string, dati: { nome: string; telefono: string; spotify_url?: string }) {
   return req(`/profili?id=eq.${userId}`, { method: "PATCH", body: JSON.stringify(dati) });
-}
-export async function resetPassword(email: string) {
-  const res = await fetch(`${BASE}/auth/v1/recover`, {
-    method: "POST",
-    headers: { "apikey": KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message ?? data.error);
-  return data;
-}
-export async function aggiornaPassword(token: string, password: string) {
-  const res = await fetch(`${BASE}/auth/v1/user`, {
-    method: "PUT",
-    headers: { "apikey": KEY, "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-    body: JSON.stringify({ password }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message ?? data.error);
-  return data;
 }
