@@ -5,12 +5,41 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { initializeApp } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import {
   registrati, accedi, esci,
   fetchDisponibilita, inviaRichiesta,
   fetchRichiesteCliente, fetchSessioniCliente,
   fetchProfilo, aggiornaProfilo, resetPassword, aggiornaPassword,
 } from "./supabase";
+
+// ── Firebase ──
+const firebaseApp = initializeApp({
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+});
+
+async function richiediNotifiche(userId) {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return null;
+    const messaging = getMessaging(firebaseApp);
+    const token = await getToken(messaging, { vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY });
+    if (!token) return null;
+    // Salva token su Supabase
+    await fetch(`${SUPA_BASE}/fcm_tokens`, {
+      method: "POST",
+      headers: { ...SUPA_H },
+      body: JSON.stringify({ user_id: userId, token, tipo: "cliente" }),
+    });
+    return token;
+  } catch { return null; }
+}
 
 const C = {
   orange:      "#E8610A",
@@ -35,7 +64,7 @@ const GIORNI_BREVI = ["L","M","M","G","V","S","D"];
 const PUBLIC_URL = "https://audio.beatcavestudio.it";
 const SUPA_BASE  = "https://lpznonwpofwywtvikgfm.supabase.co/rest/v1";
 const SUPA_KEY   = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
-const SUPA_H     = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`, "Content-Type": "application/json" };
+const SUPA_H     = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" };
 
 async function supaReq(path, options) {
   const res = await fetch(`${SUPA_BASE}${path}`, { ...options, headers: { ...SUPA_H, ...(options?.headers ?? {}) } });
@@ -598,6 +627,7 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   const [spotifyUrl, setSpotifyUrl] = useState(profilo?.spotify_url ?? "");
   const [salvando, setSalvando]     = useState(false);
   const [toast, setToast]           = useState(false);
+  const [notifiche, setNotifiche]   = useState(Notification.permission === "granted");
 
   useEffect(() => { setNome(profilo?.nome ?? ""); }, [profilo?.nome]);
   useEffect(() => { setTelefono(profilo?.telefono ?? ""); }, [profilo?.telefono]);
@@ -616,11 +646,43 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
     finally { setSalvando(false); }
   };
 
+  const handleAttivaNotifiche = async () => {
+    const token = await richiediNotifiche(utente.id);
+    if (token) {
+      setNotifiche(true);
+      setToast(true);
+      setTimeout(() => setToast(false), 2000);
+    } else {
+      alert("Non è stato possibile attivare le notifiche. Controlla i permessi del browser.");
+    }
+  };
+
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", paddingBottom: 80, display: "flex", flexDirection: "column", gap: 12 }}>
-      {toast && <div style={{ background: C.green, color: "#fff", borderRadius: 10, padding: "11px 14px", fontSize: 13, fontWeight: 700, textAlign: "center" }}>✓ Profilo aggiornato!</div>}
+      {toast && <div style={{ background: C.green, color: "#fff", borderRadius: 10, padding: "11px 14px", fontSize: 13, fontWeight: 700, textAlign: "center" }}>✓ {notifiche ? "Notifiche attivate!" : "Profilo aggiornato!"}</div>}
 
       <SpotifyBanner spotifyUrl={profilo?.spotify_url} />
+
+      {/* NOTIFICHE */}
+      {!notifiche && (
+        <div style={{ background: C.orangeLight, borderRadius: 12, padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 24 }}>🔔</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.orange }}>Attiva le notifiche</div>
+            <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>Ricevi aggiornamenti su sessioni e file</div>
+          </div>
+          <button onClick={handleAttivaNotifiche} style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: C.orange, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+            Attiva
+          </button>
+        </div>
+      )}
+
+      {notifiche && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🔔</span>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.greenDark }}>Notifiche attive</div>
+        </div>
+      )}
 
       <Card>
         <SectionLabel>I tuoi dati</SectionLabel>
@@ -676,7 +738,6 @@ export default function App() {
   const [resettando, setResettando]   = useState(false);
 
   useEffect(() => {
-    // Gestisce reset password da URL
     const hash = window.location.hash;
     if (hash.includes("type=recovery")) {
       const params = new URLSearchParams(hash.replace("#", ""));
@@ -684,7 +745,6 @@ export default function App() {
       if (accessToken) { setModalReset(true); setResetToken(accessToken); }
     }
 
-    // Ripristina sessione da localStorage
     const savedProfilo = localStorage.getItem("bc_profilo");
     if (savedProfilo) {
       try { setProfilo(JSON.parse(savedProfilo)); } catch {}
@@ -695,7 +755,6 @@ export default function App() {
       try {
         const u = JSON.parse(saved);
         setUtente(u);
-        // Aggiorna profilo dal server in background
         fetchProfilo(u.id).then(p => {
           if (p) {
             setProfilo(p);
@@ -706,6 +765,20 @@ export default function App() {
     }
     setLoading(false);
   }, []);
+
+  // Gestisce messaggi Firebase in foreground
+  useEffect(() => {
+    if (!utente) return;
+    try {
+      const messaging = getMessaging(firebaseApp);
+      onMessage(messaging, (payload) => {
+        const { title, body } = payload.notification ?? {};
+        if (title) {
+          new Notification(title, { body, icon: "/logo.png" });
+        }
+      });
+    } catch { /* browser non supporta */ }
+  }, [utente]);
 
   const handleLogin = async (u) => {
     setUtente(u);
@@ -720,15 +793,14 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-  if (utente) await esci(utente.token).catch(() => {});
-  setUtente(null);
-  setProfilo(null);
-  localStorage.removeItem("bc_utente");
-  // NON rimuovere bc_profilo — serve al prossimo login
-};
+    if (utente) await esci(utente.token).catch(() => {});
+    setUtente(null);
+    setProfilo(null);
+    localStorage.removeItem("bc_utente");
+  };
 
   if (loading) return <LoadingScreen />;
-if (!utente) return <SchermatAuth onLogin={handleLogin} />;
+  if (!utente) return <SchermatAuth onLogin={handleLogin} />;
 
   const TABS = [
     { id: "prenota",  label: "Prenota",      icon: "📅" },
