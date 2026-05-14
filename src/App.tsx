@@ -726,7 +726,6 @@ export default function App() {
   localStorage.removeItem("bc_utente");
   // NON rimuovere bc_profilo — serve al prossimo login
 };
-  };
 
   if (loading) return <LoadingScreen />;
 if (!utente) return <SchermatAuth onLogin={handleLogin} />;
