@@ -720,11 +720,12 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    if (utente) await esci(utente.token).catch(() => {});
-    setUtente(null);
-    setProfilo(null);
-    localStorage.removeItem("bc_utente");
-    localStorage.removeItem("bc_profilo");
+  if (utente) await esci(utente.token).catch(() => {});
+  setUtente(null);
+  setProfilo(null);
+  localStorage.removeItem("bc_utente");
+  // NON rimuovere bc_profilo — serve al prossimo login
+};
   };
 
   if (loading) return <LoadingScreen />;
