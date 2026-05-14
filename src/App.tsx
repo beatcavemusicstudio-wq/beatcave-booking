@@ -627,7 +627,9 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   const [spotifyUrl, setSpotifyUrl] = useState(profilo?.spotify_url ?? "");
   const [salvando, setSalvando]     = useState(false);
   const [toast, setToast]           = useState(false);
-  const [notifiche, setNotifiche]   = useState(Notification.permission === "granted");
+  const [notifiche, setNotifiche] = useState(() => {
+  try { return Notification.permission === "granted"; } catch { return false; }
+});
 
   useEffect(() => { setNome(profilo?.nome ?? ""); }, [profilo?.nome]);
   useEffect(() => { setTelefono(profilo?.telefono ?? ""); }, [profilo?.telefono]);
