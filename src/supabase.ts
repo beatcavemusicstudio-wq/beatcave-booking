@@ -32,7 +32,7 @@ export async function registrati(email: string, password: string, nome: string, 
   const data = await res.json();
   if (data.error) throw new Error(data.error.message ?? data.error);
 
-  const userId = data.user?.id ?? data.id ?? null;
+  const userId = data.user?.id ?? null;
   if (userId) {
     try {
       await req("/profili", {
@@ -40,16 +40,16 @@ export async function registrati(email: string, password: string, nome: string, 
         body: JSON.stringify({ id: userId, nome: nome || email, telefono: telefono || "", spotify_url: "" }),
       });
     } catch { /* profilo già esistente */ }
+    try {
+      await req("/clienti", {
+        method: "POST",
+        body: JSON.stringify({ nome: nome || email, email, telefono: telefono || "" }),
+      });
+    } catch { /* cliente già esistente */ }
   }
 
-  // Aggiunge il cliente alla tabella clienti del gestionale
-  try {
-    await req("/clienti", {
-      method: "POST",
-      body: JSON.stringify({ nome: nome || email, email, telefono: telefono || "" }),
-    });
-  } catch { /* cliente già esistente con quella email */ }
-
+  // Restituisce già il token — non serve chiamare accedi
+  if (!data.access_token) throw new Error("Registrazione completata ma login fallito. Riprova ad accedere.");
   return data;
 }
 
