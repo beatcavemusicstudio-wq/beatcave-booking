@@ -24,6 +24,10 @@ const firebaseApp = initializeApp({
   appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 });
 
+const SUPA_BASE = "https://lpznonwpofwywtvikgfm.supabase.co/rest/v1";
+const SUPA_KEY  = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
+const SUPA_H    = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" };
+
 async function richiediNotifiche(userId) {
   try {
     const permission = await Notification.requestPermission();
@@ -31,7 +35,6 @@ async function richiediNotifiche(userId) {
     const messaging = getMessaging(firebaseApp);
     const token = await getToken(messaging, { vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY });
     if (!token) return null;
-    // Salva token su Supabase
     await fetch(`${SUPA_BASE}/fcm_tokens`, {
       method: "POST",
       headers: { ...SUPA_H },
@@ -62,9 +65,6 @@ const MESI_BREVI = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott",
 const GIORNI_BREVI = ["L","M","M","G","V","S","D"];
 
 const PUBLIC_URL = "https://audio.beatcavestudio.it";
-const SUPA_BASE  = "https://lpznonwpofwywtvikgfm.supabase.co/rest/v1";
-const SUPA_KEY   = "sb_publishable_BGd9aD4jqt6K6txVpDCifA_C-IvCaP_";
-const SUPA_H     = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" };
 
 async function supaReq(path, options) {
   const res = await fetch(`${SUPA_BASE}${path}`, { ...options, headers: { ...SUPA_H, ...(options?.headers ?? {}) } });
@@ -273,7 +273,11 @@ function SchermatAuth({ onLogin }) {
       if (modo === "registrati") {
         if (!nome.trim()) { setErrore("Inserisci il tuo nome"); setLoading(false); return; }
         if (!telefono.trim()) { setErrore("Inserisci il tuo numero di telefono"); setLoading(false); return; }
-        await registrati(email, password, nome.trim(), telefono.trim());
+        const regData = await registrati(email, password, nome.trim(), telefono.trim());
+        if (regData?.user?.id) {
+          onLogin({ id: regData.user.id, email: regData.user.email, token: regData.access_token });
+          return;
+        }
       }
       const data = await accedi(email, password);
       if (!data?.user?.id) throw new Error("Login fallito");
@@ -627,9 +631,9 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
   const [spotifyUrl, setSpotifyUrl] = useState(profilo?.spotify_url ?? "");
   const [salvando, setSalvando]     = useState(false);
   const [toast, setToast]           = useState(false);
-  const [notifiche, setNotifiche] = useState(() => {
-  try { return Notification.permission === "granted"; } catch { return false; }
-});
+  const [notifiche, setNotifiche]   = useState(() => {
+    try { return Notification.permission === "granted"; } catch { return false; }
+  });
 
   useEffect(() => { setNome(profilo?.nome ?? ""); }, [profilo?.nome]);
   useEffect(() => { setTelefono(profilo?.telefono ?? ""); }, [profilo?.telefono]);
@@ -665,7 +669,6 @@ function TabProfilo({ utente, profilo, onLogout, onAggiornaProfilo }) {
 
       <SpotifyBanner spotifyUrl={profilo?.spotify_url} />
 
-      {/* NOTIFICHE */}
       {!notifiche && (
         <div style={{ background: C.orangeLight, borderRadius: 12, padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 24 }}>🔔</span>
@@ -768,16 +771,13 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  // Gestisce messaggi Firebase in foreground
   useEffect(() => {
     if (!utente) return;
     try {
       const messaging = getMessaging(firebaseApp);
       onMessage(messaging, (payload) => {
         const { title, body } = payload.notification ?? {};
-        if (title) {
-          new Notification(title, { body, icon: "/logo.png" });
-        }
+        if (title) new Notification(title, { body, icon: "/logo.png" });
       });
     } catch { /* browser non supporta */ }
   }, [utente]);
