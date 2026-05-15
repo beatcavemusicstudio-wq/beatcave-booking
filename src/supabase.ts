@@ -48,7 +48,7 @@ export async function registrati(email: string, password: string, nome: string, 
     } catch { /* cliente già esistente */ }
   }
 
-  // Restituisce già il token — non serve chiamare accedi
+  // Restituisce già il token — non serve chiamare accedi separatamente
   if (!data.access_token) throw new Error("Registrazione completata ma login fallito. Riprova ad accedere.");
   return data;
 }
