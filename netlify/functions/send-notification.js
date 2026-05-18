@@ -2,7 +2,10 @@ const { google } = require("googleapis");
 
 const PROJECT_ID   = process.env.FIREBASE_PROJECT_ID;
 const CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
-const PRIVATE_KEY  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+const PRIVATE_KEY  = process.env.FIREBASE_PRIVATE_KEY
+  ?.replace(/\\n/g, "\n")
+  ?.replace(/^"/, "")
+  ?.replace(/"$/, "");
 
 async function getAccessToken() {
   const auth = new google.auth.JWT(
@@ -31,7 +34,7 @@ exports.handler = async (event) => {
     console.log("TITLE:", title);
     console.log("PROJECT_ID:", PROJECT_ID);
     console.log("CLIENT_EMAIL:", CLIENT_EMAIL);
-    console.log("PRIVATE_KEY presente:", !!PRIVATE_KEY);
+    console.log("PRIVATE_KEY inizio:", PRIVATE_KEY?.substring(0, 50));
 
     if (!token || !title) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: "token e title richiesti" }) };
 
