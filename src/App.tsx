@@ -393,7 +393,25 @@ function TabPrenota({ utente, profilo }) {
         tipo, note,
       });
       setSuccesso(true);
-      setSlotSel(null);
+
+// Notifica admin
+try {
+  const adminTokens = await fetch(`${SUPA_BASE}/fcm_tokens?tipo=eq.admin`, { headers: SUPA_H });
+  const tokens = await adminTokens.json();
+  for (const t of tokens ?? []) {
+    await fetch("/.netlify/functions/send-notification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: t.token,
+        title: "🎙 Nuova richiesta!",
+        body: `${profilo?.nome ?? utente.email} ha richiesto uno slot`,
+      }),
+    });
+  }
+} catch { /* silenzioso */ }
+
+setSlotSel(null);
       setNote("");
       setTimeout(() => setSuccesso(false), 3000);
       fetchDisponibilita().then(rows => setDisp(rows));
