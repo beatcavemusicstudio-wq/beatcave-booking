@@ -2,11 +2,12 @@ const { google } = require("googleapis");
 
 const PROJECT_ID   = process.env.FIREBASE_PROJECT_ID;
 const CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
-const PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY
+const PRIVATE_KEY  = process.env.FIREBASE_PRIVATE_KEY
   ?.split(" ")
   .join("\n")
   .replace("-----BEGIN\nPRIVATE\nKEY-----", "-----BEGIN PRIVATE KEY-----")
   .replace("-----END\nPRIVATE\nKEY-----", "-----END PRIVATE KEY-----");
+
 async function getAccessToken() {
   const auth = new google.auth.JWT(
     CLIENT_EMAIL,
@@ -29,17 +30,9 @@ exports.handler = async (event) => {
 
   try {
     const { token, title, body } = JSON.parse(event.body || "{}");
-
-    console.log("TOKEN:", token ? token.substring(0, 30) + "..." : "MANCANTE");
-    console.log("TITLE:", title);
-    console.log("PROJECT_ID:", PROJECT_ID);
-    console.log("CLIENT_EMAIL:", CLIENT_EMAIL);
-    console.log("PRIVATE_KEY inizio:", PRIVATE_KEY?.substring(0, 50));
-
     if (!token || !title) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: "token e title richiesti" }) };
 
     const accessToken = await getAccessToken();
-    console.log("ACCESS TOKEN ottenuto:", !!accessToken);
 
     const res = await fetch(`https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`, {
       method: "POST",
@@ -63,12 +56,9 @@ exports.handler = async (event) => {
     });
 
     const data = await res.json();
-    console.log("FCM RESPONSE:", JSON.stringify(data));
-
     if (!res.ok) return { statusCode: 500, headers: cors, body: JSON.stringify({ error: data }) };
     return { statusCode: 200, headers: cors, body: JSON.stringify({ success: true }) };
   } catch (e) {
-    console.log("ERRORE:", e.message);
     return { statusCode: 500, headers: cors, body: JSON.stringify({ error: e.message }) };
   }
 };
