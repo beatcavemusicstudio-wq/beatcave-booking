@@ -2,8 +2,11 @@ const { google } = require("googleapis");
 
 const PROJECT_ID   = process.env.FIREBASE_PROJECT_ID;
 const CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
-const PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY;
-
+const PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY
+  ?.split(" ")
+  .join("\n")
+  .replace("-----BEGIN\nPRIVATE\nKEY-----", "-----BEGIN PRIVATE KEY-----")
+  .replace("-----END\nPRIVATE\nKEY-----", "-----END PRIVATE KEY-----");
 async function getAccessToken() {
   const auth = new google.auth.JWT(
     CLIENT_EMAIL,
