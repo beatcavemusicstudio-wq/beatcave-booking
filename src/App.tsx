@@ -273,7 +273,11 @@ function SchermatAuth({ onLogin }) {
       if (modo === "registrati") {
         if (!nome.trim()) { setErrore("Inserisci il tuo nome"); setLoading(false); return; }
         if (!telefono.trim()) { setErrore("Inserisci il tuo numero di telefono"); setLoading(false); return; }
-        await registrati(email, password, nome.trim(), telefono.trim());
+        const regData = await registrati(email, password, nome.trim(), telefono.trim());
+        if (regData?.access_token && regData?.user?.id) {
+          onLogin({ id: regData.user.id, email: regData.user.email, token: regData.access_token });
+          return;
+        }
       }
       const data = await accedi(email, password);
       if (!data?.user?.id) throw new Error("Login fallito");
